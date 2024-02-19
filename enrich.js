@@ -71,8 +71,8 @@ const loginAndScrapeData = async (loginUrl, urlsWithOriginalData, writeToCsv, lo
                 await new Promise(resolve => setTimeout(resolve, 3000));
                 await page.click('#rememlg');
                 await page.waitForSelector('input[name="nume"]', { visible: true });
-                await page.type('input[name="nume"]', email);
-                await page.type('input[name="pwd"]', password);
+                await page.type('input[name="nume"]', loginEmail);
+                await page.type('input[name="pwd"]', loginPassword);
                 await page.click('input[name="submitlog"]');
                 await new Promise(resolve => setTimeout(resolve, 3000));
             }
