@@ -28,17 +28,18 @@ async function navigateToPage(pageUrl) {
     return page; // Returns the new page instance
 }
 
-// Function to wait for user input for the number of pages to scrape
-async function waitForUserInput(page) {
+// Function to wait for user input for the start and end pages to scrape
+async function waitForUserInput() {
     const rl = readline.createInterface({
         input: process.stdin,
         output: process.stdout
     });
 
     return new Promise(resolve => {
-        rl.question("Enter the number of pages you want to scrape: ", answer => {
+        rl.question("Enter the start and end pages you want to scrape (e.g., '2 6'): ", answer => {
             rl.close();
-            resolve(Number(answer));
+            const [startPage, endPage] = answer.split(' ').map(Number);
+            resolve({ startPage, endPage });
         });
     });
 }
@@ -82,12 +83,14 @@ async function clickNextPage(page) {
 // Main function to orchestrate the scraping
 async function main(startPageUrl) {
     const page = await navigateToPage(startPageUrl);
-    const pagesToScrape = await waitForUserInput(page);
+    const { startPage, endPage } = await waitForUserInput();
 
-    for (let currentPage = 1; currentPage <= pagesToScrape; currentPage++) {
+    for (let currentPage = startPage; currentPage <= endPage; currentPage++) {
+        if (currentPage !== startPage) {
+            const hasNextPage = await clickNextPage(page);
+            if (!hasNextPage) break; // Exit the loop if there's no next page
+        }
         await scrapeAndWriteCurrentPage(page, currentPage);
-        const hasNextPage = await clickNextPage(page);
-        if (!hasNextPage) break; // Exit the loop if there's no next page
     }
 
     // Export cookies to a file
