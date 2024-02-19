@@ -176,7 +176,7 @@ const updateCsvWithCombinedData = async (loginUrl, inputCsvFilename, outputCsvFi
 
 const loginEmail = 'catalingaitan620@gmail.com'
 const loginPassword = 'Sandel123.'
-const timeBetweenScrape = 500;
+const timeBetweenScrape = 2000;
 const loginUrl = 'https://membri.listafirme.ro/';
 const inputCsvFilename = 'table_data.csv';
 const outputCsvFilename = 'updated_with_combined_data.csv';
