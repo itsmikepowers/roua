@@ -25,16 +25,14 @@ const loginAndScrapeData = async (loginUrl, urlsWithOriginalData, writeToCsv) =>
         await dialog.accept();
     });
 
-    email = 'catalingaitan620@gmail.com'
-    password = 'Sandel123.'
 
     await new Promise(resolve => setTimeout(resolve, 3000));
 
     // Proceed with clicking the login button and entering credentials
     await page.click('#rememlg');
     await page.waitForSelector('input[name="nume"]', { visible: true });
-    await page.type('input[name="nume"]', email);
-    await page.type('input[name="pwd"]', password);
+    await page.type('input[name="nume"]', loginEmail);
+    await page.type('input[name="pwd"]', loginPassword);
     await page.click('input[name="submitlog"]');
 
     // Wait for 3 seconds to ensure the login process is completed and any post-login alert is accepted
@@ -47,7 +45,7 @@ const loginAndScrapeData = async (loginUrl, urlsWithOriginalData, writeToCsv) =>
         while (retryCount < maxRetries) {
             try {
                 await page.goto(url, { waitUntil: 'domcontentloaded' });
-                // await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise(resolve => setTimeout(resolve, timeBetweenScrape));
                 const data = await page.evaluate(scrapePageData, headers2);
                 const combinedData = { ...originalData, ...data };
                 await writeToCsv(combinedData); // Write each scraped data to the CSV file
@@ -174,6 +172,11 @@ const updateCsvWithCombinedData = async (loginUrl, inputCsvFilename, outputCsvFi
         });
 };
 
+
+
+const loginEmail = 'catalingaitan620@gmail.com'
+const loginPassword = 'Sandel123.'
+const timeBetweenScrape = 500;
 const loginUrl = 'https://membri.listafirme.ro/';
 const inputCsvFilename = 'table_data.csv';
 const outputCsvFilename = 'updated_with_combined_data.csv';
