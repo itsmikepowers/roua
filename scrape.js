@@ -69,9 +69,21 @@ async function scrapeAndWriteCurrentPage(page, currentPageNumber) {
     }
 }
 
+// Function to navigate to the specified start page by clicking the next page button
+async function goToStartPage(page, startPage) {
+    for (let currentPage = 1; currentPage < startPage; currentPage++) {
+        const hasNextPage = await clickNextPage(page);
+        if (!hasNextPage) {
+            console.log("Reached the last page before reaching the start page.");
+            return false;
+        }
+    }
+    return true;
+}
+
 // Function to click the next page button
 async function clickNextPage(page) {
-    const nextPageButton = await page.$(".fa-arrow-right"); // Adjust selector as needed
+    const nextPageButton = await page.$(".fa-arrow-right"); // Adjust the selector as needed
     if (nextPageButton) {
         await nextPageButton.click();
         await page.waitForNavigation({waitUntil: 'networkidle2'});
@@ -85,12 +97,23 @@ async function main(startPageUrl) {
     const page = await navigateToPage(startPageUrl);
     const { startPage, endPage } = await waitForUserInput();
 
+    // Navigate to the specified start page
+    const reachedStartPage = await goToStartPage(page, startPage);
+    if (!reachedStartPage) {
+        console.log(`Could not reach the start page: ${startPage}. Exiting...`);
+        await browser.close();
+        return;
+    }
+
     for (let currentPage = startPage; currentPage <= endPage; currentPage++) {
-        if (currentPage !== startPage) {
-            const hasNextPage = await clickNextPage(page);
-            if (!hasNextPage) break; // Exit the loop if there's no next page
-        }
         await scrapeAndWriteCurrentPage(page, currentPage);
+        if (currentPage < endPage) {
+            const hasNextPage = await clickNextPage(page);
+            if (!hasNextPage) {
+                console.log("No more pages to navigate. Ending scrape.");
+                break; // Exit the loop if there's no next page
+            }
+        }
     }
 
     // Export cookies to a file
