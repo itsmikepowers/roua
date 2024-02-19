@@ -7,7 +7,7 @@ const path = require('path');
 
 const headers2 = ["Judeţ", "Localitate/Sector", "Adresă", "Telefon", "Mobil", "Email", "Persoane din conducere:", "Adresă web", "Marketplace"];
 
-const loginAndScrapeData = async (loginUrl, urlsWithOriginalData, writeToCsv) => {
+const loginAndScrapeData = async (loginUrl, urlsWithOriginalData, writeToCsv, loginEmail, loginPassword, timeBetweenScrape) => {
     console.log(`Opening login page: ${loginUrl}...`);
     let browser = await puppeteer.launch({
         headless: true,
@@ -147,7 +147,7 @@ const scrapePageData = (headers2) => {
     return { ...firstTableData, ...structuredLocalizationData };
 };
 
-const updateCsvWithCombinedData = async (loginUrl, inputCsvFilename, outputCsvFilename) => {
+const updateCsvWithCombinedData = async (loginUrl, inputCsvFilename, outputCsvFilename, loginEmail, loginPassword, timeBetweenScrape) => {
     const urlsWithOriginalData = [];
 
     // Create a writable stream for the output CSV and write the headers
@@ -167,7 +167,7 @@ const updateCsvWithCombinedData = async (loginUrl, inputCsvFilename, outputCsvFi
         })
         .on('end', async () => {
             console.log('Finished reading CSV');
-            await loginAndScrapeData(loginUrl, urlsWithOriginalData, writeToCsv);
+            await loginAndScrapeData(loginUrl, urlsWithOriginalData, writeToCsv, loginEmail, loginPassword, timeBetweenScrape);
             csvStream.end(); // End the stream after all data has been written
         });
 };
@@ -181,4 +181,4 @@ const loginUrl = 'https://membri.listafirme.ro/';
 const inputCsvFilename = 'table_data.csv';
 const outputCsvFilename = 'updated_with_combined_data.csv';
 
-updateCsvWithCombinedData(loginUrl, inputCsvFilename, outputCsvFilename).catch(console.error);
+updateCsvWithCombinedData(loginUrl, inputCsvFilename, outputCsvFilename, loginEmail, loginPassword, timeBetweenScrape).catch(console.error);
