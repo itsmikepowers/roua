@@ -2,46 +2,88 @@ const puppeteer = require('puppeteer');
 const csv = require('fast-csv');
 const fs = require('fs');
 const readline = require('readline');
+const os = require('os');
+const path = require('path');
 
 const headers2 = ["Judeţ", "Localitate/Sector", "Adresă", "Telefon", "Mobil", "Email", "Persoane din conducere:", "Adresă web", "Marketplace"];
 
-const loginAndScrapeData = async (loginUrl, urlsWithOriginalData) => {
+const loginAndScrapeData = async (loginUrl, urlsWithOriginalData, writeToCsv) => {
     console.log(`Opening login page: ${loginUrl}...`);
-    const browser = await puppeteer.launch({
-        headless: false, // Open the browser UI for manual login
-        userDataDir: './user_data', // Specify the path to store user data
-        defaultViewport: null
+    let browser = await puppeteer.launch({
+        headless: true,
+        defaultViewport: null,
+        userDataDir: path.join(os.tmpdir(), 'puppeteer_' + Math.random().toString().substring(2)),
     });
 
-    const loginPage = await browser.newPage();
-    await loginPage.goto(loginUrl, { waitUntil: 'domcontentloaded' });
+    let page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537');
+    await page.goto(loginUrl, { waitUntil: 'domcontentloaded' });
 
-    console.log('Please log in. Type "go" in the terminal once logged in to start scraping.');
-    await waitForUserInput();
+    // Setup listener for alert dialog and automatically accept it
+    page.on('dialog', async dialog => {
+        console.log('Alert dialog detected, accepting it...');
+        await dialog.accept();
+    });
 
-    const scrapedData = [];
+    email = 'catalingaitan620@gmail.com'
+    password = 'Sandel123.'
 
-    // Split the urls into chunks of 5
-    for (let i = 0; i < urlsWithOriginalData.length; i += 5) {
-        const chunk = urlsWithOriginalData.slice(i, i + 5);
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
-        // Use Promise.all to scrape multiple pages concurrently
-        const data = await Promise.all(chunk.map(async ({ url, originalData }) => {
-            const page = await browser.newPage(); // Create a new page for each URL
-            await page.goto(url, { waitUntil: 'domcontentloaded' });
-            const data = await page.evaluate(scrapePageData, headers2);
-            const combinedData = { ...originalData, ...data }; // Combine original data with scraped data
-            console.log(`Finished scraping ${url}`);
-            await page.close(); // Close the page when done to free up resources
-            return combinedData;
-        }));
+    // Proceed with clicking the login button and entering credentials
+    await page.click('#rememlg');
+    await page.waitForSelector('input[name="nume"]', { visible: true });
+    await page.type('input[name="nume"]', email);
+    await page.type('input[name="pwd"]', password);
+    await page.click('input[name="submitlog"]');
 
-        scrapedData.push(...data);
+    // Wait for 3 seconds to ensure the login process is completed and any post-login alert is accepted
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    for (const { url, originalData } of urlsWithOriginalData) {
+        let retryCount = 0;
+        const maxRetries = 3; // Set maximum number of retries here
+    
+        while (retryCount < maxRetries) {
+            try {
+                await page.goto(url, { waitUntil: 'domcontentloaded' });
+                // await new Promise(resolve => setTimeout(resolve, 500));
+                const data = await page.evaluate(scrapePageData, headers2);
+                const combinedData = { ...originalData, ...data };
+                await writeToCsv(combinedData); // Write each scraped data to the CSV file
+                console.log(`Finished scraping ${url}`);
+                break; // Break the loop if the page was scraped successfully
+            } catch (error) {
+                console.log(`Failed to scrape. Restarting the browser...`);
+                await new Promise(resolve => setTimeout(resolve, 20000));
+                
+                await browser.close();
+                await new Promise(resolve => setTimeout(resolve, 10000));
+                browser = await puppeteer.launch({
+                    headless: false,
+                    defaultViewport: null,
+                    userDataDir: path.join(os.tmpdir(), 'puppeteer_' + Math.random().toString().substring(2))
+                });
+                page = await browser.newPage();
+                await page.goto(loginUrl, { waitUntil: 'domcontentloaded' });
+                page.on('dialog', async dialog => {
+                    console.log('Alert dialog detected, accepting it...');
+                    await dialog.accept();
+                });
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                await page.click('#rememlg');
+                await page.waitForSelector('input[name="nume"]', { visible: true });
+                await page.type('input[name="nume"]', email);
+                await page.type('input[name="pwd"]', password);
+                await page.click('input[name="submitlog"]');
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            }
+        }
     }
 
     await browser.close();
-    return scrapedData;
 };
+
 
 const waitForUserInput = () => {
     const rl = readline.createInterface({
@@ -76,9 +118,8 @@ const scrapePageData = (headers2) => {
 
     let localizationData = {};
     for (let i = 5; i >= 2; i--) { // Start from the 6th table and go backwards
-        const tables = document.querySelectorAll('table');
-        if (i < tables.length) {
-            const table = tables[i];
+        const table = document.querySelectorAll('table')[i];
+        if (table) {
             const tempData = extractTableData(table);
             if (Object.keys(tempData).length > 0) {
                 localizationData = tempData;
@@ -111,18 +152,25 @@ const scrapePageData = (headers2) => {
 const updateCsvWithCombinedData = async (loginUrl, inputCsvFilename, outputCsvFilename) => {
     const urlsWithOriginalData = [];
 
+    // Create a writable stream for the output CSV and write the headers
+    const csvStream = csv.format({ headers: true });
+    const ws = fs.createWriteStream(outputCsvFilename);
+    csvStream.pipe(ws);
+
+    // Function to write data to the CSV
+    const writeToCsv = (data) => {
+        csvStream.write(data);
+    };
+
     fs.createReadStream(inputCsvFilename)
         .pipe(csv.parse({ headers: true }))
         .on('data', row => {
-            // Include the original row data along with the URL
             urlsWithOriginalData.push({ url: row.URL, originalData: { 'Page Number': row['Page Number'], 'Business Name': row['Business Name'], 'URL': row['URL'] } });
         })
         .on('end', async () => {
             console.log('Finished reading CSV');
-            const scrapedData = await loginAndScrapeData(loginUrl, urlsWithOriginalData);
-
-            const ws = fs.createWriteStream(outputCsvFilename);
-            csv.write(scrapedData, { headers: true }).pipe(ws);
+            await loginAndScrapeData(loginUrl, urlsWithOriginalData, writeToCsv);
+            csvStream.end(); // End the stream after all data has been written
         });
 };
 
